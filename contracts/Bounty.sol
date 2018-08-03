@@ -37,17 +37,6 @@ contract Bounty {
     mapping(address => Vote) voter;
     address[] public voterAddresses;
 
-    event logString(string);
-    event logParameters(
-        address _owner,
-        uint _posterDeposit, 
-        uint _id, 
-        string _description,
-        uint _voterDeposit,
-        uint _challengerDeadline,
-        uint _voterDeadline
-    );
-
     constructor(
         uint _posterDeposit, 
         address _owner,
@@ -60,7 +49,7 @@ contract Bounty {
     public 
     payable
     {
-        require(msg.value >= _posterDeposit, "Insufficient funds, ETH sent must be greater than or equal to bounty deposit");
+        require(msg.value >= _posterDeposit, "Insufficient funds, ETH sent must be equal to bounty deposit");
 
         require(!isInitialized, "Bounty is not modifiable");
 
@@ -77,42 +66,23 @@ contract Bounty {
         isInitialized = true;
     }
 
-    // /** @dev Initialized Bounty contract with variables passed in from BountyBoard contract
-    // *   @param _description - description of bounty
-    // *   @param _voterDeposit - amount deposited by voter
-    // *   @param _challengerDeadline - deadline for submitting challenges
-    // *   @param _voterDeadline - deadline for submitting vote commits
-    // */
-    // function initializeBounty(
-    //     string _description, 
-    //     uint _voterDeposit, 
-    //     uint _challengerDeadline, 
-    //     uint _voterDeadline
-    // )
-    // public
-    // {
-    //     require(isInitialized = false, "Bounty is not modifiable");
-
-    //     owner = msg.sender;
-    //     status = uint(Status.Active);
-    //     creationTimestamp = now;
-    //     description = _description;
-    //     voterDeposit = _voterDeposit;
-    //     challengerDeadline = _challengerDeadline;
-    //     voterDeadline = _voterDeadline;
-
-    //     isInitialized = true;
-    // }
-
 
     // GENERAL FUNCTIONS \\
 
-
-    function getParameters()
+    function getBountyParameters()
     public
     view
+    returns(
+        address _owner,
+        uint _posterDeposit, 
+        uint _id, 
+        string _description,
+        uint _voterDeposit,
+        uint _challengerDeadline,
+        uint _voterDeadline
+    )
     {
-        emit logParameters(
+        return(
             owner,
             posterDeposit, 
             id, 
@@ -121,18 +91,6 @@ contract Bounty {
             challengerDeadline,
             voterDeadline
         );
-    }
-
-    /** @dev Returns the total amount held in the bounty
-    Note: This is not particularly useful, the vote and challenger bounties need to be differentiated. 
-    *   @return balance of contract
-    */
-    function getBountyTotal() 
-    public
-    view
-    returns(uint balance)
-    {
-        return address(this).balance;
     }
 
 
@@ -150,6 +108,8 @@ contract Bounty {
 
         _challenger.ipfsHash.push(_ipfsHash);
         _challenger.submissionTimestamp = now;
+
+        challengerAddresses.push(msg.sender);
     }   
 
 

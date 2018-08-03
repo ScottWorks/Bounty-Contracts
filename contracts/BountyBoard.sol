@@ -40,15 +40,6 @@ contract BountyBoard {
         voterDeadline
         );
 
-        // bountyContract.initializeBounty(
-            // msg.sender,
-            // numBountyContracts,
-            // description,
-            // voterDeposit, 
-            // challengerDeadline, 
-            // voterDeadline
-        // );
-
         bountyContractAddresses.push(bountyContract);
        
         return address(bountyContract);
