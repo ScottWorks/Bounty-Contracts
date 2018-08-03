@@ -5,9 +5,12 @@ import "./Bounty.sol";
 contract BountyBoard {
 
     uint numBountyContracts = 0;
+ 
     address[] bountyContractAddresses;
     mapping(address => Bounty) bountyContracts; 
  
+    event LogAddress(address);
+
     Bounty bountyContract;
 
     function getAllBountyAddresses() 
@@ -18,29 +21,33 @@ contract BountyBoard {
         return bountyContractAddresses;
     }
 
-    function createBountyContract(
-        string description,
-        uint posterDeposit, 
-        uint voterDeposit, 
-        uint challengerDeadline, 
-        uint voterDeadline
-        ) 
+    function createBountyContract(uint posterDeposit, string description, uint voterDeposit, uint challengerDeadline, uint voterDeadline) 
     public 
     payable
     returns(address)
-    {
+    {        
         numBountyContracts++; 
 
-        bountyContract = (new Bounty).value(msg.value)(posterDeposit);
+        address owner = msg.sender;
 
-        bountyContract.initializeBounty(
-            msg.sender,
-            numBountyContracts,
-            description,
-            voterDeposit, 
-            challengerDeadline, 
-            voterDeadline
+        bountyContract = (new Bounty).value(msg.value)(
+        posterDeposit,
+        owner, 
+        numBountyContracts, 
+        description, 
+        voterDeposit, 
+        challengerDeadline, 
+        voterDeadline
         );
+
+        // bountyContract.initializeBounty(
+            // msg.sender,
+            // numBountyContracts,
+            // description,
+            // voterDeposit, 
+            // challengerDeadline, 
+            // voterDeadline
+        // );
 
         bountyContractAddresses.push(bountyContract);
        
