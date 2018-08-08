@@ -21,7 +21,7 @@ contract BountyBoard {
         return bountyContractAddresses;
     }
 
-    function createBountyContract(uint posterDeposit, string description, uint voterDeposit, uint challengerDeadline, uint voterDeadline) 
+    function createBountyContract(uint posterDeposit, string description, uint voterDeposit, uint challengeDuration, uint voteDuration) 
     public 
     payable
     returns(address)
@@ -36,8 +36,8 @@ contract BountyBoard {
         numBountyContracts, 
         description, 
         voterDeposit, 
-        challengerDeadline, 
-        voterDeadline
+        challengeDuration, 
+        voteDuration
         );
 
         bountyContractAddresses.push(bountyContract);

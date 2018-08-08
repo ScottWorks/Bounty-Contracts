@@ -2,15 +2,23 @@ pragma solidity ^0.4.18;
 
 contract Bounty {
 
+
+
+// =========
+// VARIABLES
+// =========
+
+
+
     address owner;
-    uint id;
+    uint id = 0;
     uint posterDeposit;
     uint status;
     uint creationTimestamp;
     string description;
     uint voterDeposit;
-    uint challengerDeadline;
-    uint voterDeadline;
+    uint challengeDuration;
+    uint voteDuration;
     bool isInitialized = false;
 
     enum Status {
@@ -19,23 +27,57 @@ contract Bounty {
     }
 
     struct Challenge {
+        address challengerAddress;
         string[] ipfsHash;
         uint submissionTimestamp;
         uint upVotes;
     }
 
-    mapping(address => Challenge) challenger;
-    address[] public challengerAddresses;
+    mapping(uint => Challenge) challengerId;
+    uint[] challengerIds;
 
     struct Vote {
         uint deposit;
         uint commitTimestamp;
-        bytes32 hashedCommit; 
+        bytes32 commitHash; 
         uint upVotesAvailable;
     }
 
     mapping(address => Vote) voter;
-    address[] public voterAddresses;
+    address[] voterAddresses;
+
+    modifier isChallengePeriod(){
+        require(now < creationTimestamp + challengeDuration, "Challenge period has ended.");
+        _;
+    }
+
+    modifier isCommitPeriod(){
+        require(now > creationTimestamp + challengeDuration, "Commit period has not started.");
+        require(now < creationTimestamp + challengeDuration + voteDuration, "Commit period has ended.");
+        _;
+    }
+
+    modifier isRevealPeriod(){
+        require(now > creationTimestamp + challengeDuration + voteDuration, "Reveal period has not started.");
+        require(now < creationTimestamp + challengeDuration + voteDuration + 2 days, "Reveal period has ended.");
+        _;
+    }
+    
+    modifier isPollingPeriod(){
+        require(now > creationTimestamp + challengeDuration + voteDuration + 2 days, "Polling period has not started.");
+        _;
+    }
+
+    event LogString(bytes stringgy);
+    event LogHash(bytes20 _address, bytes32 _commitHash, bytes32 _revealHash);
+
+
+
+// ===========
+// CONSTRUCTOR
+// ===========
+
+
 
     constructor(
         uint _posterDeposit, 
@@ -44,7 +86,7 @@ contract Bounty {
         string _description,
         uint _voterDeposit,
         uint _challengerDeadline,
-        uint _voterDeadline
+        uint _voteDuration
         ) 
     public 
     payable
@@ -60,14 +102,19 @@ contract Bounty {
         creationTimestamp = now;
         description = _description;
         voterDeposit = _voterDeposit;
-        challengerDeadline = _challengerDeadline;
-        voterDeadline = _voterDeadline;
+        challengeDuration = _challengerDeadline;
+        voteDuration = _voteDuration;
 
         isInitialized = true;
     }
 
 
-    // GENERAL FUNCTIONS \\
+
+// =================
+// GENERAL FUNCTIONS
+// =================
+
+
 
     function getBountyParameters()
     public
@@ -79,7 +126,7 @@ contract Bounty {
         string _description,
         uint _voterDeposit,
         uint _challengerDeadline,
-        uint _voterDeadline
+        uint _voteDuration
     )
     {
         return(
@@ -88,51 +135,67 @@ contract Bounty {
             id, 
             description,
             voterDeposit,
-            challengerDeadline,
-            voterDeadline
+            challengeDuration,
+            voteDuration
         );
     }
 
 
-    // CHALLENGER INTERFACE \\
+
+// ====================
+// CHALLENGER INTERFACE
+// ====================
+
+
 
     /** @dev Maps sender address to deposit, IPFS Hash, timestamp, upVotes, and an array of voter addresses. Stores ETH deposited and updates the challenger addresss array
     *   @param _ipfsHash - Hash of content submitted to IPFS
     */
     function submitChallenge(string _ipfsHash) 
     public
+    isChallengePeriod
     {
-        require(now < challengerDeadline, "Challenge deadline has expired");
         
-        Challenge storage _challenger = challenger[msg.sender];
+        // require(now < challengeDuration, "Challenge deadline has expired");
+        
+
+        Challenge storage _challenger = challengerId[id];
 
         _challenger.ipfsHash.push(_ipfsHash);
+        _challenger.challengerAddress = msg.sender;
         _challenger.submissionTimestamp = now;
 
-        challengerAddresses.push(msg.sender);
+        challengerIds.push(id);
+        id++; 
     }   
 
 
     /** @dev Returns array containing challenger addresses
     *   @return array of challenger addresses
     */
-    function getAllChallengerAddresses() 
+    function getAllChallengerIds() 
     public
     view 
-    returns(address[])
+    returns(uint[])
     {
-        return challengerAddresses;
+        return challengerIds;
     }
 
 
-    // VOTER INTERFACE \\    
+
+// ===============
+// VOTER INTERFACE
+// ===============
+
+
 
     function submitVoteDeposit()
     public
     payable
+    // isCommitPeriod
     {
-        require(now < voterDeadline, "Commit deadline has expired");
-        require(now > challengerDeadline, "Challenge period has not ended yet");
+        // require(now < voteDuration, "Commit deadline has expired");
+        // require(now > challengeDuration, "Challenge period has not ended yet");
         require(msg.value >= voterDeposit, "Insufficient funds");
 
         Vote storage _voter = voter[msg.sender];
@@ -142,32 +205,43 @@ contract Bounty {
         voterAddresses.push(msg.sender);
     }
 
-    function submitCommit(bytes32 commit) public {
-        require(now < voterDeadline, "Commit deadline has expired");
-        require(now > challengerDeadline, "Challenge period has not ended yet");
+    // function submitCommit(bytes32 commitHash) public {
+    function submitCommit(bytes20 challengerAddress, uint salt) 
+    public 
+    // isCommitPeriod
+    {
+
+        // require(now < voteDuration, "Commit deadline has expired");
+        // require(now > challengeDuration, "Challenge period has not ended yet");
 
         Vote storage _voter = voter[msg.sender];
 
         require(_voter.upVotesAvailable > 0, "Not enough votes available");
-        require(_voter.deposit > voterDeposit * _voter.upVotesAvailable, "Insufficient funds");
+        require(_voter.deposit >= voterDeposit * _voter.upVotesAvailable, "Insufficient funds");
 
         _voter.commitTimestamp = now;
-        _voter.hashedCommit = commit;
+        _voter.commitHash = keccak256(abi.encodePacked(challengerAddress, salt));
         _voter.upVotesAvailable--;
     }
 
-    function revealCommit(address challengerAddress, string secret) public {
-        require(now < voterDeadline + 2 days, "Reveal deadline has expired");
-        require(now > voterDeadline, "Commit period has not ended yet");
+
+    function revealCommit(bytes20 challengerAddress, uint salt) 
+    public 
+    // isRevealPeriod
+    {
+        // require(now < voteDuration + 2 days, "Reveal deadline has expired");
+        // require(now > voteDuration, "Commit period has not ended yet");
 
         Vote storage _voter = voter[msg.sender];
 
-        bytes32 hashedVote = keccak256(abi.encodePacked(challengerAddress, secret));
+        bytes32 revealHash = keccak256(abi.encodePacked(challengerAddress, salt));
 
-        require(_voter.hashedCommit == hashedVote, "Previously submitted commit does not match reveal hash");
+        emit LogHash(challengerAddress, _voter.commitHash, revealHash);
 
-        Challenge storage _challenger = challenger[challengerAddress];
+        // require(_voter.commitHash == revealHash, "Previously submitted commit does not match reveal hash");
 
-        _challenger.upVotes++; 
+        // Challenge storage _challenger = challengerId[_challengerId];
+
+        // _challenger.upVotes++; 
     }
 }
