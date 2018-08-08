@@ -36,7 +36,6 @@ contract Bounty {
 
     struct Vote {
         uint deposit;
-        uint commitTimestamp;
         bytes32 commitHash; 
         uint upVotesAvailable;
     }
@@ -195,7 +194,7 @@ contract Bounty {
     }
 
     // function submitCommit(bytes32 commitHash) public {
-    function submitCommit(bytes20 challengerAddress, uint salt) 
+    function submitCommit(bytes32 _commitHash) 
     public 
     // isCommitPeriod
     {
@@ -204,8 +203,7 @@ contract Bounty {
         require(_voter.upVotesAvailable > 0, "Not enough votes available");
         require(_voter.deposit >= voterDeposit * _voter.upVotesAvailable, "Insufficient funds");
 
-        _voter.commitTimestamp = now;
-        _voter.commitHash = keccak256(abi.encodePacked(challengerAddress, salt));
+        _voter.commitHash = _commitHash;
         _voter.upVotesAvailable--;
     }
 
@@ -224,5 +222,15 @@ contract Bounty {
         Challenge storage _challenger = challengerAddress[address(_challengerAddress)];
 
         _challenger.upVotes++; 
+    }
+
+    function getVoteUpvoteCount(address _challengerAddress)
+    public
+    view
+    // isRevealPeriod
+    returns(uint)
+    {
+        Challenge storage _challenger = challengerAddress[_challengerAddress];
+        return _challenger.upVotes;
     }
 }
