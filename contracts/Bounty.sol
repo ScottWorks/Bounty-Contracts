@@ -27,14 +27,12 @@ contract Bounty {
     }
 
     struct Challenge {
-        address challengerAddress;
         string[] ipfsHash;
-        uint submissionTimestamp;
         uint upVotes;
     }
 
-    mapping(uint => Challenge) challengerId;
-    uint[] challengerIds;
+    mapping(address => Challenge) challengerAddress;
+    address[] challengerAddresses;
 
     struct Vote {
         uint deposit;
@@ -153,19 +151,12 @@ contract Bounty {
     */
     function submitChallenge(string _ipfsHash) 
     public
-    isChallengePeriod
-    {
-        
-        // require(now < challengeDuration, "Challenge deadline has expired");
-        
-
-        Challenge storage _challenger = challengerId[id];
+    // isChallengePeriod
+    {  
+        Challenge storage _challenger = challengerAddress[msg.sender];
 
         _challenger.ipfsHash.push(_ipfsHash);
-        _challenger.challengerAddress = msg.sender;
-        _challenger.submissionTimestamp = now;
-
-        challengerIds.push(id);
+        challengerAddresses.push(msg.sender);
         id++; 
     }   
 
@@ -176,9 +167,9 @@ contract Bounty {
     function getAllChallengerIds() 
     public
     view 
-    returns(uint[])
+    returns(address[])
     {
-        return challengerIds;
+        return challengerAddresses;
     }
 
 
@@ -194,8 +185,6 @@ contract Bounty {
     payable
     // isCommitPeriod
     {
-        // require(now < voteDuration, "Commit deadline has expired");
-        // require(now > challengeDuration, "Challenge period has not ended yet");
         require(msg.value >= voterDeposit, "Insufficient funds");
 
         Vote storage _voter = voter[msg.sender];
@@ -210,10 +199,6 @@ contract Bounty {
     public 
     // isCommitPeriod
     {
-
-        // require(now < voteDuration, "Commit deadline has expired");
-        // require(now > challengeDuration, "Challenge period has not ended yet");
-
         Vote storage _voter = voter[msg.sender];
 
         require(_voter.upVotesAvailable > 0, "Not enough votes available");
@@ -224,24 +209,20 @@ contract Bounty {
         _voter.upVotesAvailable--;
     }
 
-
-    function revealCommit(bytes20 challengerAddress, uint salt) 
+    function revealCommit(bytes20 _challengerAddress, uint salt) 
     public 
     // isRevealPeriod
     {
-        // require(now < voteDuration + 2 days, "Reveal deadline has expired");
-        // require(now > voteDuration, "Commit period has not ended yet");
-
         Vote storage _voter = voter[msg.sender];
 
-        bytes32 revealHash = keccak256(abi.encodePacked(challengerAddress, salt));
+        bytes32 revealHash = keccak256(abi.encodePacked(_challengerAddress, salt));
 
-        emit LogHash(challengerAddress, _voter.commitHash, revealHash);
+        emit LogHash(_challengerAddress, _voter.commitHash, revealHash);
 
-        // require(_voter.commitHash == revealHash, "Previously submitted commit does not match reveal hash");
+        require(_voter.commitHash == revealHash, "Previously submitted commit does not match reveal hash");
 
-        // Challenge storage _challenger = challengerId[_challengerId];
+        Challenge storage _challenger = challengerAddress[address(_challengerAddress)];
 
-        // _challenger.upVotes++; 
+        _challenger.upVotes++; 
     }
 }

@@ -4,6 +4,8 @@ import "./Bounty.sol";
 
 contract BountyBoard {
 
+    Bounty bountyContract;
+
     uint numBountyContracts = 0;
  
     address[] bountyContractAddresses;
@@ -11,7 +13,12 @@ contract BountyBoard {
  
     event LogAddress(address);
 
-    Bounty bountyContract;
+
+// =================
+// GENERAL FUNCTIONS
+// =================
+
+
 
     function getAllBountyAddresses() 
     public 
@@ -20,6 +27,14 @@ contract BountyBoard {
     {
         return bountyContractAddresses;
     }
+
+
+
+// ==================
+// CONTRACT INTERFACE
+// ==================
+
+
 
     function createBountyContract(uint posterDeposit, string description, uint voterDeposit, uint challengeDuration, uint voteDuration) 
     public 
