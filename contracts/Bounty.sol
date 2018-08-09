@@ -260,7 +260,8 @@ contract Bounty {
         for(uint i = 0; i < _voter.commitHash.length; i++){
             if(_voter.commitHash[i] == revealHash){
                 flag = true;
-                return;
+                delete _voter.commitHash[i];
+                break;
             }
         }
 
