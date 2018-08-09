@@ -5,8 +5,6 @@ import "./Bounty.sol";
 contract BountyBoard {
 
     Bounty bountyContract;
-
-    uint numBountyContracts = 0;
  
     address[] bountyContractAddresses;
     mapping(address => Bounty) bountyContracts; 
@@ -36,19 +34,22 @@ contract BountyBoard {
 
 
 
-    function createBountyContract(uint posterDeposit, string description, uint voterDeposit, uint challengeDuration, uint voteDuration) 
+    function createBountyContract(
+        uint posterDeposit, 
+        string description, 
+        uint voterDeposit, 
+        uint challengeDuration, 
+        uint voteDuration
+        ) 
     public 
     payable
     returns(address)
     {        
-        numBountyContracts++; 
-
         address owner = msg.sender;
 
         bountyContract = (new Bounty).value(msg.value)(
         posterDeposit,
         owner, 
-        numBountyContracts, 
         description, 
         voterDeposit, 
         challengeDuration, 

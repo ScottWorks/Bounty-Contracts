@@ -11,9 +11,7 @@ contract Bounty {
 
 
     address owner;
-    uint id = 0;
     uint posterDeposit;
-    uint status;
     uint creationTimestamp;
     string description;
     uint voterDeposit;
@@ -21,14 +19,13 @@ contract Bounty {
     uint voteDuration;
     bool isInitialized = false;
 
-    enum Status {
-        Active,
-        Inactive
-    }
+    address private bountyWinner;
 
     struct Challenge {
         string[] ipfsHash;
+        uint submissionTimestamp;
         uint upVotes;
+        address[] voted;
     }
 
     mapping(address => Challenge) challengerAddress;
@@ -36,12 +33,20 @@ contract Bounty {
 
     struct Vote {
         uint deposit;
-        bytes32 commitHash; 
+        bytes32[] commitHash; 
         uint upVotesAvailable;
     }
 
     mapping(address => Vote) voter;
     address[] voterAddresses;
+
+
+
+// ==================
+// FUNCTION MODIFIERS
+// ==================
+
+
 
     modifier isChallengePeriod(){
         require(now < creationTimestamp + challengeDuration, "Challenge period has ended.");
@@ -56,17 +61,26 @@ contract Bounty {
 
     modifier isRevealPeriod(){
         require(now > creationTimestamp + challengeDuration + voteDuration, "Reveal period has not started.");
-        require(now < creationTimestamp + challengeDuration + voteDuration + 2 days, "Reveal period has ended.");
+        require(now < creationTimestamp + challengeDuration + voteDuration + 48 hours, "Reveal period has ended.");
         _;
     }
     
     modifier isPollingPeriod(){
-        require(now > creationTimestamp + challengeDuration + voteDuration + 2 days, "Polling period has not started.");
+        require(now > creationTimestamp + challengeDuration + voteDuration + 48 hours, "Polling period has not started.");
         _;
     }
 
+
+
+// ==========
+// EVENT LOGS
+// ==========
+
+
+
     event LogString(bytes stringgy);
     event LogHash(bytes20 _address, bytes32 _commitHash, bytes32 _revealHash);
+    event LogAddressArraySize(uint _size);
 
 
 
@@ -79,7 +93,6 @@ contract Bounty {
     constructor(
         uint _posterDeposit, 
         address _owner,
-        uint _id, 
         string _description,
         uint _voterDeposit,
         uint _challengerDeadline,
@@ -94,8 +107,6 @@ contract Bounty {
 
         posterDeposit = _posterDeposit;
         owner = _owner;
-        id = _id;
-        status = uint(Status.Active);
         creationTimestamp = now;
         description = _description;
         voterDeposit = _voterDeposit;
@@ -108,7 +119,7 @@ contract Bounty {
 
 
 // =================
-// GENERAL FUNCTIONS
+// GENERAL INTERFACE
 // =================
 
 
@@ -119,7 +130,6 @@ contract Bounty {
     returns(
         address _owner,
         uint _posterDeposit, 
-        uint _id, 
         string _description,
         uint _voterDeposit,
         uint _challengerDeadline,
@@ -129,11 +139,38 @@ contract Bounty {
         return(
             owner,
             posterDeposit, 
-            id, 
             description,
             voterDeposit,
             challengeDuration,
             voteDuration
+        );
+    }
+
+    function getUpvoteCount(address _challengerAddress)
+    public
+    view
+    returns(uint)
+    {
+        Challenge storage _challenger = challengerAddress[_challengerAddress];
+        return _challenger.upVotes;
+    }
+
+    function getBountyWinner()
+    public
+    view
+    // isPollingPeriod
+    returns(
+        address,
+        uint, 
+        uint
+    )
+    {
+        Challenge storage winner = challengerAddress[bountyWinner];
+
+        return(
+            bountyWinner,
+            winner.submissionTimestamp,
+            winner.upVotes
         );
     }
 
@@ -155,8 +192,10 @@ contract Bounty {
         Challenge storage _challenger = challengerAddress[msg.sender];
 
         _challenger.ipfsHash.push(_ipfsHash);
+        _challenger.submissionTimestamp = now;
         challengerAddresses.push(msg.sender);
-        id++; 
+        
+        emit LogAddressArraySize(challengerAddresses.length);
     }   
 
 
@@ -188,12 +227,11 @@ contract Bounty {
 
         Vote storage _voter = voter[msg.sender];
 
-        _voter.deposit = msg.value;
+        _voter.deposit += msg.value;
         _voter.upVotesAvailable++;
         voterAddresses.push(msg.sender);
     }
 
-    // function submitCommit(bytes32 commitHash) public {
     function submitCommit(bytes32 _commitHash) 
     public 
     // isCommitPeriod
@@ -203,34 +241,88 @@ contract Bounty {
         require(_voter.upVotesAvailable > 0, "Not enough votes available");
         require(_voter.deposit >= voterDeposit * _voter.upVotesAvailable, "Insufficient funds");
 
-        _voter.commitHash = _commitHash;
+        _voter.commitHash.push(_commitHash);
         _voter.upVotesAvailable--;
     }
 
     function revealCommit(bytes20 _challengerAddress, uint salt) 
     public 
     // isRevealPeriod
+    returns(address)
     {
         Vote storage _voter = voter[msg.sender];
+        Challenge storage _challenger = challengerAddress[address(_challengerAddress)];
 
         bytes32 revealHash = keccak256(abi.encodePacked(_challengerAddress, salt));
 
-        emit LogHash(_challengerAddress, _voter.commitHash, revealHash);
+        bool flag = false; 
+       
+        for(uint i = 0; i < _voter.commitHash.length; i++){
+            if(_voter.commitHash[i] == revealHash){
+                flag = true;
+                return;
+            }
+        }
 
-        require(_voter.commitHash == revealHash, "Previously submitted commit does not match reveal hash");
-
-        Challenge storage _challenger = challengerAddress[address(_challengerAddress)];
+        require(flag, "Submitted entry does not match any stored commit hashes.");
 
         _challenger.upVotes++; 
+        _challenger.voted.push(msg.sender);
+
+        return declareWinner(address(_challengerAddress));
     }
 
-    function getVoteUpvoteCount(address _challengerAddress)
-    public
-    view
-    // isRevealPeriod
-    returns(uint)
+
+
+// ==================
+// WITHDRAW INTERFACE
+// ==================
+
+
+
+    // function withdrawFunds()
+    // public
+    // payable
+    // // isPollingPeriod
+    // {
+    //     if(msg.sender == bountyWinner){
+    //         msg.sender.transfer(posterDeposit);
+
+    //     } else {
+    //         Challenge storage winner = challengerAddress[bountyWinner];
+            
+
+    //         // require(winner.voted[msg.sender], "Sorry, you bet on the wrong horse...");
+        
+
+    //     }        
+    // }
+
+
+
+// ================
+// HELPER FUNCTIONS
+// ================
+
+
+
+    function declareWinner(address _challengerAddress) 
+    private 
+    returns(address)
     {
         Challenge storage _challenger = challengerAddress[_challengerAddress];
-        return _challenger.upVotes;
+        Challenge storage winner = challengerAddress[bountyWinner];
+
+        if(_challenger.upVotes > winner.upVotes){
+            bountyWinner = _challengerAddress;
+        } else if(_challenger.upVotes == winner.upVotes) {
+            if(_challenger.submissionTimestamp <= winner.submissionTimestamp){
+                bountyWinner = _challengerAddress;
+            } 
+        }
+        
+        return bountyWinner;
     }
+
+ 
 }
